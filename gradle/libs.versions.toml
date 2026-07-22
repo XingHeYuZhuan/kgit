@@ -1,16 +1,14 @@
 [versions]
 agp = "9.3.0"
-kotlin = "2.3.10"
+kotlin = "2.4.10"
 
-# KMP 纯跨平台核心库版本
 coroutines = "1.11.0"
 ktor = "3.5.1"
 okio = "3.17.0"
+vanniktechMavenPublish = "0.37.0"
 
 [libraries]
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
-
-# KMP 跨平台依赖
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
 kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "coroutines" }
 ktor-client-core = { module = "io.ktor:ktor-client-core", version.ref = "ktor" }
@@ -23,3 +21,4 @@ okio-fakefilesystem = { module = "com.squareup.okio:okio-fakefilesystem", versio
 [plugins]
 android-kotlin-multiplatform-library = { id = "com.android.kotlin.multiplatform.library", version.ref = "agp" }
 kotlinMultiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
+vanniktech-mavenPublish = { id = "com.vanniktech.maven.publish", version.ref = "vanniktechMavenPublish" }

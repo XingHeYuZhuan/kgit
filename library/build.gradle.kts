@@ -3,7 +3,7 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
     alias(libs.plugins.android.kotlin.multiplatform.library)
-    id("maven-publish")
+    alias(libs.plugins.vanniktech.mavenPublish)
 }
 
 group = "com.xingheyuzhuan.kgit"
@@ -82,35 +82,37 @@ kotlin {
     }
 }
 
-publishing {
-    publications.withType<MavenPublication> {
-        artifactId = "kgit"
+mavenPublishing {
+    publishToMavenCentral()
+    signAllPublications()
 
-        pom {
-            name.set("kgit")
-            description.set("A Kotlin Multiplatform Git library.")
+    coordinates(group.toString(), "kgit", version.toString())
+
+    pom {
+        name.set("kgit")
+        description.set("A Kotlin Multiplatform Git library.")
+        url.set("https://github.com/XingHeYuZhuan/kgit")
+
+        licenses {
+            license {
+                name.set("The Apache Software License, Version 2.0")
+                url.set("https://www.apache.org/licenses/LICENSE-2.0.txt")
+                distribution.set("repo")
+            }
+        }
+
+        developers {
+            developer {
+                id.set("XingHeYuZhuan")
+                name.set("XingHeYuZhuan")
+                url.set("https://github.com/XingHeYuZhuan")
+            }
+        }
+
+        scm {
+            connection.set("scm:git:git://github.com/XingHeYuZhuan/kgit.git")
+            developerConnection.set("scm:git:ssh://github.com/XingHeYuZhuan/kgit.git")
             url.set("https://github.com/XingHeYuZhuan/kgit")
-
-            licenses {
-                license {
-                    name.set("The Apache Software License, Version 2.0")
-                    url.set("https://www.apache.org/licenses/LICENSE-2.0.txt")
-                    distribution.set("repo")
-                }
-            }
-
-            developers {
-                developer {
-                    id.set("XingHeYuZhuan")
-                    name.set("XingHeYuZhuan")
-                }
-            }
-
-            scm {
-                connection.set("scm:git:git://github.com/XingHeYuZhuan/kgit.git")
-                developerConnection.set("scm:git:ssh://github.com/XingHeYuZhuan/kgit.git")
-                url.set("https://github.com/XingHeYuZhuan/kgit")
-            }
         }
     }
 }
