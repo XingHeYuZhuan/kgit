@@ -52,35 +52,20 @@ kotlin {
             implementation(libs.kotlinx.coroutines.core)
         }
 
-        // JVM 平台引擎配置
-        getByName("jvmMain") {
-            dependencies {
-                implementation(libs.ktor.client.cio)
-            }
+        jvmMain.dependencies {
+            implementation(libs.ktor.client.cio)
         }
 
-        // Android 平台引擎配置
-        getByName("androidMain") {
-            dependencies {
-                implementation(libs.ktor.client.cio)
-            }
+        androidMain.dependencies {
+            implementation(libs.ktor.client.cio)
         }
 
-        // Apple 平台共享引擎 (iOS & macOS)
-        val appleMain = create("appleMain") {
-            dependsOn(getByName("commonMain"))
-            dependencies {
-                implementation(libs.ktor.client.darwin)
-            }
+        appleMain.dependencies {
+            implementation(libs.ktor.client.darwin)
         }
-        getByName("iosX64Main").dependsOn(appleMain)
-        getByName("iosArm64Main").dependsOn(appleMain)
-        getByName("macosX64Main").dependsOn(appleMain)
-        getByName("macosArm64Main").dependsOn(appleMain)
 
-        // Linux 与 Windows 桌面原生平台引擎
         val desktopNativeMain = create("desktopNativeMain") {
-            dependsOn(getByName("commonMain"))
+            dependsOn(commonMain.get())
             dependencies {
                 implementation(libs.ktor.client.curl)
             }
