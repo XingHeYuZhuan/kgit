@@ -6,7 +6,7 @@ plugins {
     alias(libs.plugins.vanniktech.mavenPublish)
 }
 
-group = "com.xingheyuzhuan.kgit"
+group = "io.github.xingheyuzhuan"
 version = "1.0.0"
 
 kotlin {
