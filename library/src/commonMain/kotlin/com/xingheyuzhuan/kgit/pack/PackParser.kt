@@ -1,12 +1,16 @@
 package com.xingheyuzhuan.kgit.pack
 
+import com.xingheyuzhuan.kgit.logging.ProgressMonitor
 import com.xingheyuzhuan.kgit.model.*
 import okio.Buffer
 import okio.ByteString.Companion.toByteString
 import okio.Source
 import okio.inflate
 
-class PackParser(private val packBytes: ByteArray) {
+class PackParser(
+    private val packBytes: ByteArray,
+    private val progressMonitor: ProgressMonitor? = null
+) {
 
     private data class RawObject(
         val type: ObjectType,
@@ -99,8 +103,15 @@ class PackParser(private val packBytes: ByteArray) {
         val resolvedByOffset = mutableMapOf<Int, GitObject>()
         val sha1Map = mutableMapOf<String, GitObject>()
 
+        val deltaCount = rawObjects.count { it.type == ObjectType.OFS_DELTA || it.type == ObjectType.REF_DELTA }
+        if (deltaCount > 0) {
+            progressMonitor?.beginTask("Resolving deltas", deltaCount)
+        }
+
         fun resolveRawObject(raw: RawObject): GitObject {
             resolvedByOffset[raw.offset]?.let { return it }
+
+            val isDelta = raw.type == ObjectType.OFS_DELTA || raw.type == ObjectType.REF_DELTA
 
             val finalObject = when (raw.type) {
                 ObjectType.COMMIT, ObjectType.TREE, ObjectType.BLOB, ObjectType.TAG -> {
@@ -139,6 +150,11 @@ class PackParser(private val packBytes: ByteArray) {
 
             resolvedByOffset[raw.offset] = finalObject
             sha1Map[finalObject.sha1] = finalObject
+
+            if (isDelta) {
+                progressMonitor?.update(1)
+            }
+
             return finalObject
         }
 
@@ -150,7 +166,13 @@ class PackParser(private val packBytes: ByteArray) {
         }
 
         // 第二阶段：全量还原所有对象
-        return rawObjects.map { resolveRawObject(it) }
+        val resultList = rawObjects.map { resolveRawObject(it) }
+
+        if (deltaCount > 0) {
+            progressMonitor?.endTask()
+        }
+
+        return resultList
     }
 
     private fun readObjectTypeAndSize(source: okio.BufferedSource): Pair<Int, Long> {

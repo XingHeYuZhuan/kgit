@@ -1,5 +1,6 @@
 package com.xingheyuzhuan.kgit.checkout
 
+import com.xingheyuzhuan.kgit.logging.ProgressMonitor
 import com.xingheyuzhuan.kgit.model.BlobObject
 import com.xingheyuzhuan.kgit.model.TreeObject
 import com.xingheyuzhuan.kgit.storage.ObjectStore
@@ -16,16 +17,24 @@ object TreeCheckout {
      * @param targetDir 本地目标输出路径
      * @param fileSystem 显式注入文件系统实例（如 JVM/Android 端传入 FileSystem.SYSTEM，测试时传入 FakeFileSystem）
      * @param filter 路径过滤器，返回 false 则跳过该文件的写入
+     * @param progressMonitor 进度监听器
      */
     fun checkoutTree(
         store: ObjectStore,
         treeSha1: String,
         targetDir: Path,
         fileSystem: FileSystem,
-        filter: ((relativePath: String) -> Boolean)? = null
+        filter: ((relativePath: String) -> Boolean)? = null,
+        progressMonitor: ProgressMonitor? = null
     ) {
         val rootTree = store.getAs<TreeObject>(treeSha1)
             ?: error("Root tree object not found in object store: $treeSha1")
+
+        // 1. 统计需要落盘的文件总数
+        val totalFiles = countFiles(store, rootTree, "", filter)
+        if (totalFiles > 0) {
+            progressMonitor?.beginTask("Checking out working tree", totalFiles)
+        }
 
         fileSystem.createDirectories(targetDir)
         walk(
@@ -34,8 +43,13 @@ object TreeCheckout {
             baseDir = targetDir,
             currentPath = "",
             fileSystem = fileSystem,
-            filter = filter
+            filter = filter,
+            progressMonitor = progressMonitor
         )
+
+        if (totalFiles > 0) {
+            progressMonitor?.endTask()
+        }
     }
 
     private fun walk(
@@ -44,7 +58,8 @@ object TreeCheckout {
         baseDir: Path,
         currentPath: String,
         fileSystem: FileSystem,
-        filter: ((String) -> Boolean)?
+        filter: ((String) -> Boolean)?,
+        progressMonitor: ProgressMonitor?
     ) {
         for (entry in currentTree.entries) {
             val relativePath = if (currentPath.isEmpty()) entry.name else "$currentPath/${entry.name}"
@@ -53,7 +68,7 @@ object TreeCheckout {
             if (isDirectory) {
                 val subTree = store.getAs<TreeObject>(entry.sha1)
                     ?: error("Sub-tree object not found: ${entry.sha1} (path: $relativePath)")
-                walk(store, subTree, baseDir, relativePath, fileSystem, filter)
+                walk(store, subTree, baseDir, relativePath, fileSystem, filter, progressMonitor)
             } else {
                 if (filter != null && !filter(relativePath)) {
                     continue
@@ -71,7 +86,31 @@ object TreeCheckout {
                 fileSystem.write(filePath) {
                     write(blob.rawData)
                 }
+
+                progressMonitor?.update(1)
             }
         }
+    }
+
+    private fun countFiles(
+        store: ObjectStore,
+        currentTree: TreeObject,
+        currentPath: String,
+        filter: ((String) -> Boolean)?
+    ): Int {
+        var count = 0
+        for (entry in currentTree.entries) {
+            val relativePath = if (currentPath.isEmpty()) entry.name else "$currentPath/${entry.name}"
+            val isDirectory = entry.mode == "40000" || entry.mode == "040000"
+            if (isDirectory) {
+                val subTree = store.getAs<TreeObject>(entry.sha1) ?: continue
+                count += countFiles(store, subTree, relativePath, filter)
+            } else {
+                if (filter == null || filter(relativePath)) {
+                    count++
+                }
+            }
+        }
+        return count
     }
 }

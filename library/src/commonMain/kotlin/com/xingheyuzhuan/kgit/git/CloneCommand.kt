@@ -48,21 +48,21 @@ class CloneCommand {
         // 提取简短分支名 (如 "refs/heads/main" -> "main")
         val shortBranchName = targetRefName.removePrefix("refs/heads/")
 
-        // 4. 下载 Packfile 并解析为 GitObject 集合
+        // 4. 下载 Packfile
         progressMonitor.beginTask("Downloading packfile", ProgressMonitor.UNKNOWN)
         val packBytes = httpClient.downloadPackfile(
             repoUrl = uri,
             targetHash = targetCommitHash,
-            token = token
+            token = token,
+            progressMonitor = progressMonitor
         )
         progressMonitor.endTask()
 
-        progressMonitor.beginTask("Parsing packfile objects", ProgressMonitor.UNKNOWN)
-        val gitObjects = PackParser(packBytes).parse()
+        // 5. 解析 Packfile 对象
+        val gitObjects = PackParser(packBytes, progressMonitor).parse()
         val store = ObjectStore(gitObjects)
-        progressMonitor.endTask()
 
-        // 5. 初始化标准的 .git 元数据结构并持久化所有 Loose Objects
+        // 6. 初始化标准的 .git 元数据结构并持久化所有 Loose Objects
         progressMonitor.beginTask("Initializing .git metadata", ProgressMonitor.UNKNOWN)
         initGitMetadataDirectory(
             fileSystem = fileSystem,
@@ -75,18 +75,17 @@ class CloneCommand {
         )
         progressMonitor.endTask()
 
-        // 6. 检出工作区（Working Tree）文件
+        // 7. 检出工作区（Working Tree）文件
         val commitObject = store.getAs<CommitObject>(targetCommitHash)
             ?: error("Commit object not found in packfile: $targetCommitHash")
 
-        progressMonitor.beginTask("Checking out working tree", ProgressMonitor.UNKNOWN)
         TreeCheckout.checkoutTree(
             store = store,
             treeSha1 = commitObject.treeHash,
             targetDir = targetDir,
-            fileSystem = fileSystem
+            fileSystem = fileSystem,
+            progressMonitor = progressMonitor
         )
-        progressMonitor.endTask()
 
         return GitRepository(targetDir, fileSystem)
     }

@@ -1,11 +1,13 @@
 package com.xingheyuzhuan.kgit.network
 
+import com.xingheyuzhuan.kgit.logging.ProgressMonitor
 import com.xingheyuzhuan.kgit.util.PktLine
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
+import okio.Buffer
 import okio.ByteString.Companion.encodeUtf8
 
 data class RemoteRef(
@@ -93,12 +95,13 @@ class GitHttpClient(
     suspend fun downloadPackfile(
         repoUrl: String,
         targetHash: String,
-        token: String? = null
+        token: String? = null,
+        progressMonitor: ProgressMonitor? = null
     ): ByteArray {
         val cleanUrl = repoUrl.trimEnd('/').removeSuffix(".git")
         val requestUrl = "$cleanUrl.git/git-upload-pack"
 
-        val bodyPayload = PktLine.encode("want $targetHash\n") + "0000" + PktLine.encode("done\n")
+        val bodyPayload = PktLine.encode("want $targetHash side-band-64k\n") + "0000" + PktLine.encode("done\n")
 
         val response: HttpResponse = client.post(requestUrl) {
             header(HttpHeaders.UserAgent, "git/2.39.0")
@@ -116,14 +119,50 @@ class GitHttpClient(
         }
 
         val rawBytes = response.body<ByteArray>()
+        val packBuffer = Buffer()
+        var cursor = 0
+
+        while (cursor < rawBytes.size) {
+            if (cursor + 4 > rawBytes.size) break
+            val lenHex = rawBytes.decodeToString(cursor, cursor + 4)
+            val lineLen = lenHex.toIntOrNull(16) ?: break
+            cursor += 4
+
+            if (lineLen == 0) continue
+
+            val payloadLen = lineLen - 4
+            if (payloadLen <= 0 || cursor + payloadLen > rawBytes.size) break
+
+            val bandId = rawBytes[cursor].toInt() and 0xFF
+            val payload = rawBytes.copyOfRange(cursor + 1, cursor + payloadLen)
+            cursor += payloadLen
+
+            when (bandId) {
+                1 -> {
+                    packBuffer.write(payload)
+                    progressMonitor?.update(payload.size)
+                }
+                2 -> {
+                    val progressText = payload.decodeToString().trimEnd('\n', '\r')
+                    if (progressText.isNotBlank()) {
+                        progressMonitor?.beginTask(progressText, ProgressMonitor.UNKNOWN)
+                    }
+                }
+                3 -> {
+                    error("Git Server Error: ${payload.decodeToString()}")
+                }
+            }
+        }
+
+        val packBytes = packBuffer.readByteArray()
         val packMagic = byteArrayOf(0x50, 0x41, 0x43, 0x4B) // "PACK"
-        val packIndex = indexOfSequence(rawBytes, packMagic)
+        val packIndex = indexOfSequence(packBytes, packMagic)
 
         if (packIndex == -1) {
             error("Valid PACK data stream not found in response")
         }
 
-        return rawBytes.copyOfRange(packIndex, rawBytes.size)
+        return packBytes.copyOfRange(packIndex, packBytes.size)
     }
 
     private fun indexOfSequence(source: ByteArray, target: ByteArray): Int {

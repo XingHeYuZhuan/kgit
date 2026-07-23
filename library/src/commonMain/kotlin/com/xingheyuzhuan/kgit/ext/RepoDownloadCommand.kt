@@ -31,43 +31,42 @@ class RepoDownloadCommand {
 
         val targetDir = directory ?: deriveDirectoryFromUrl(uri).toPath()
 
-        // 1. 获取远程 Refs
+        //  获取远程 Refs
         progressMonitor.beginTask("Discovering remote refs", ProgressMonitor.UNKNOWN)
         val discoveryResult = httpClient.discoverRemoteRefs(repoUrl = uri, token = token)
         require(discoveryResult.refs.isNotEmpty()) { "Remote repository is empty or does not exist" }
         progressMonitor.endTask()
 
-        // 2. 解析目标分支的 Commit SHA-1
+        // 解析目标分支的 Commit SHA-1
         progressMonitor.beginTask("Resolving target branch", ProgressMonitor.UNKNOWN)
         val targetCommitHash = resolveTargetHash(discoveryResult, branch)
         progressMonitor.endTask()
 
-        // 3. 下载并解析 Packfile 到内存
+        // 下载 Packfile
         progressMonitor.beginTask("Downloading packfile", ProgressMonitor.UNKNOWN)
         val packBytes = httpClient.downloadPackfile(
             repoUrl = uri,
             targetHash = targetCommitHash,
-            token = token
+            token = token,
+            progressMonitor = progressMonitor
         )
         progressMonitor.endTask()
 
-        progressMonitor.beginTask("Parsing packfile objects", ProgressMonitor.UNKNOWN)
-        val gitObjects = PackParser(packBytes).parse()
+        // 解析 Packfile 对象
+        val gitObjects = PackParser(packBytes, progressMonitor).parse()
         val store = ObjectStore(gitObjects)
-        progressMonitor.endTask()
 
-        // 4. 纯工作区检出（完全跳过 .git 目录与元数据的生成）
+        // 纯工作区检出
         val commitObject = store.getAs<CommitObject>(targetCommitHash)
             ?: error("Commit object not found in packfile: $targetCommitHash")
 
-        progressMonitor.beginTask("Checking out working tree", ProgressMonitor.UNKNOWN)
         TreeCheckout.checkoutTree(
             store = store,
             treeSha1 = commitObject.treeHash,
             targetDir = targetDir,
-            fileSystem = fileSystem
+            fileSystem = fileSystem,
+            progressMonitor = progressMonitor
         )
-        progressMonitor.endTask()
 
         return targetDir
     }
