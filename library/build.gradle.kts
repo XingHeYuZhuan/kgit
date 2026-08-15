@@ -7,7 +7,7 @@ plugins {
 }
 
 group = "io.github.xingheyuzhuan"
-version = "1.0.1"
+version = "1.0.2"
 
 kotlin {
     applyDefaultHierarchyTemplate()
@@ -37,6 +37,7 @@ kotlin {
     // Apple 平台 (iOS, macOS)
     iosX64()
     iosArm64()
+    iosSimulatorArm64()
     macosX64()
     macosArm64()
 
