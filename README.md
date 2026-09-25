@@ -24,7 +24,7 @@ repositories {
 kotlin {
     sourceSets {
         commonMain.dependencies {
-            implementation("io.github.xingheyuzhuan:kgit:1.0.0")
+            implementation("io.github.xingheyuzhuan:kgit:1.0.3")
         }
     }
 }
