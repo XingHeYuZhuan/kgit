@@ -7,7 +7,7 @@ plugins {
 }
 
 group = "io.github.xingheyuzhuan"
-version = "1.0.2"
+version = "1.0.3"
 
 kotlin {
     applyDefaultHierarchyTemplate()
@@ -54,11 +54,11 @@ kotlin {
         }
 
         jvmMain.dependencies {
-            implementation(libs.ktor.client.cio)
+            implementation(libs.ktor.client.okhttp)
         }
 
         androidMain.dependencies {
-            implementation(libs.ktor.client.cio)
+            implementation(libs.ktor.client.okhttp)
         }
 
         appleMain.dependencies {
